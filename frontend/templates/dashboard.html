@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — EventFlow</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+<nav class="navbar">
+  <div class="container">
+    <a href="/" class="nav-logo">⚡ Event<span>Flow</span></a>
+    <div class="nav-links">
+      <a href="/">Discover</a>
+      <a href="/events">Browse All</a>
+      <a href="/create-event">Create Event</a>
+    </div>
+    <div class="nav-right" id="nav-right"></div>
+  </div>
+</nav>
+
+<div style="padding:32px 0">
+  <div class="container">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;flex-wrap:wrap;gap:16px">
+      <div>
+        <h1 style="font-family:var(--font-display);font-size:28px;font-weight:800" id="dash-title">Dashboard</h1>
+        <p style="color:var(--text-2);margin-top:4px" id="dash-sub">Loading...</p>
+      </div>
+      <div id="dash-actions"></div>
+    </div>
+    
+    <!-- Stats -->
+    <div class="dashboard-grid" id="stats-row" style="margin-bottom:28px"></div>
+    
+    <!-- Tabs -->
+    <div class="tabs" id="dash-tabs" style="margin-bottom:24px"></div>
+    
+    <!-- Content -->
+    <div id="dash-content"><div class="page-loader"><div class="spinner"></div></div></div>
+  </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script>
+if (!Auth.require()) throw new Error('Auth required');
+
+const user = Auth.getUser();
+const isAdmin = user.role === 'admin';
+const isOrganizer = user.role === 'organizer' || user.role === 'admin';
+
+document.getElementById('dash-title').textContent = `Welcome, ${user.full_name.split(' ')[0]} 👋`;
+document.getElementById('dash-sub').textContent = `Your ${user.role} dashboard`;
+
+async function init() {
+  if (isAdmin) await loadAdmin();
+  else if (isOrganizer) await loadOrganizer();
+  else await loadAttendee();
+}
+
+// ── ADMIN ──────────────────────────────────────────────────────
+async function loadAdmin() {
+  document.getElementById('dash-actions').innerHTML = `
+    <a href="/create-event" class="btn btn-primary">➕ Create Event</a>`;
+  
+  document.getElementById('dash-tabs').innerHTML = `
+    <button class="tab-btn active" onclick="switchTab('events')">Events</button>
+    <button class="tab-btn" onclick="switchTab('users')">Users</button>
+    <button class="tab-btn" onclick="switchTab('registrations')">Registrations</button>`;
+  
+  try {
+    const d = await API.get('/dashboard/admin');
+    
+    document.getElementById('stats-row').innerHTML = `
+      ${statCard('📅', d.total_events, 'Total Events', 'var(--blue)')}
+      ${statCard('👥', d.total_users, 'Total Users', 'var(--green)')}
+      ${statCard('🎟️', d.total_registrations, 'Registrations', 'var(--purple)')}
+      ${statCard('💰', '$' + d.total_revenue.toFixed(2), 'Revenue', 'var(--yellow)')}`;
+    
+    loadAdminEvents(d);
+    loadChart(d.registrations_by_day);
+  } catch(err) {
+    Toast.error('Failed to load dashboard');
+  }
+}
+
+function loadAdminEvents(d) {
+  document.getElementById('dash-content').innerHTML = `
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:24px;align-items:start">
+      <div class="card">
+        <div style="padding:20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+          <div style="font-weight:700;font-size:16px">All Events</div>
+          <a href="/create-event" class="btn btn-primary btn-sm">+ New</a>
+        </div>
+        <div id="admin-events-table" class="table-wrap">
+          <div class="page-loader"><div class="spinner"></div></div>
+        </div>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:16px">
+          <div style="padding:20px">
+            <div style="font-weight:700;margin-bottom:16px">Registrations (Last 7 Days)</div>
+            <div id="reg-chart"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div style="padding:20px;border-bottom:1px solid var(--border)">
+            <div style="font-weight:700;font-size:15px">Recent Events</div>
+          </div>
+          ${d.recent_events.map(e => recentEventRow(e)).join('')}
+        </div>
+      </div>
+    </div>`;
+  
+  loadAdminEventsTable();
+}
+
+async function loadAdminEventsTable() {
+  try {
+    const data = await API.get('/events?per_page=50');
+    const rows = data.items.map(e => `
+      <tr>
+        <td><a href="/event/${e.id}" style="font-weight:600;color:var(--text-1)">${e.title.substring(0,40)}${e.title.length>40?'...':''}</a></td>
+        <td><span class="badge ${Utils.statusColor(e.status)}">${e.status}</span></td>
+        <td>${e.total_registrations}</td>
+        <td>${Utils.formatDate(e.start_datetime)}</td>
+        <td>
+          <div style="display:flex;gap:6px">
+            <a href="/event/${e.id}" class="btn btn-ghost btn-sm">View</a>
+            <button onclick="toggleFeature(${e.id}, this)" class="btn btn-ghost btn-sm">${e.is_featured?'★':'☆'}</button>
+          </div>
+        </td>
+      </tr>`).join('');
+    
+    document.getElementById('admin-events-table').innerHTML = `
+      <table>
+        <thead><tr><th>Event</th><th>Status</th><th>Registrations</th><th>Date</th><th>Actions</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  } catch {}
+}
+
+async function loadAdminUsers() {
+  document.getElementById('dash-content').innerHTML = '<div class="page-loader"><div class="spinner"></div></div>';
+  try {
+    const users = await API.get('/users');
+    const rows = users.map(u => `
+      <tr>
+        <td>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="nav-avatar" style="width:32px;height:32px;font-size:13px">${u.full_name.charAt(0)}</div>
+            <div>
+              <div style="font-weight:600;color:var(--text-1)">${u.full_name}</div>
+              <div style="font-size:12px;color:var(--text-3)">${u.email}</div>
+            </div>
+          </div>
+        </td>
+        <td><span class="badge badge-category">${u.role}</span></td>
+        <td>${Utils.formatDate(u.created_at)}</td>
+        <td><span style="color:${u.is_active?'var(--green)':'var(--red)'}">●</span> ${u.is_active?'Active':'Inactive'}</td>
+        <td>
+          <button onclick="toggleUserActive(${u.id}, this)" class="btn btn-ghost btn-sm">${u.is_active?'Deactivate':'Activate'}</button>
+        </td>
+      </tr>`).join('');
+    
+    document.getElementById('dash-content').innerHTML = `
+      <div class="card">
+        <div style="padding:20px;border-bottom:1px solid var(--border)">
+          <div style="font-weight:700;font-size:16px">All Users (${users.length})</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>User</th><th>Role</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>`;
+  } catch {}
+}
+
+async function toggleUserActive(userId, btn) {
+  try {
+    const r = await API.put(`/users/${userId}/toggle-active`);
+    Toast.success('User status updated');
+    loadAdminUsers();
+  } catch(err) { Toast.error(err.message); }
+}
+
+async function toggleFeature(eventId, btn) {
+  try {
+    const r = await API.put(`/events/${eventId}/feature`);
+    btn.textContent = r.is_featured ? '★' : '☆';
+    Toast.success(r.is_featured ? 'Event featured!' : 'Removed from featured');
+  } catch(err) { Toast.error(err.message); }
+}
+
+function loadChart(data) {
+  const max = Math.max(...data.map(d => d.count), 1);
+  const bars = data.map(d => {
+    const h = Math.max(4, (d.count / max) * 80);
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div style="font-size:10px;color:var(--text-3)">${d.count}</div>
+      <div style="width:100%;height:${h}px;background:var(--accent-glow);border-radius:3px 3px 0 0;border-top:2px solid var(--accent)"></div>
+      <div style="font-size:10px;color:var(--text-3)">${d.date}</div>
+    </div>`;
+  }).join('');
+  const el = document.getElementById('reg-chart');
+  if (el) el.innerHTML = `<div style="display:flex;align-items:flex-end;gap:6px;height:120px">${bars}</div>`;
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    b.classList.toggle('active', ['events','users','registrations'][i] === tab);
+  });
+  if (tab === 'events') loadAdmin();
+  else if (tab === 'users') loadAdminUsers();
+  else loadAdminRegistrations();
+}
+
+async function loadAdminRegistrations() {
+  document.getElementById('dash-content').innerHTML = '<div class="page-loader"><div class="spinner"></div></div>';
+  // Show check-in interface
+  document.getElementById('dash-content').innerHTML = `
+    <div class="card" style="max-width:600px">
+      <div style="padding:24px">
+        <h3 style="font-weight:700;margin-bottom:16px">🔍 Check-In Lookup</h3>
+        <div style="display:flex;gap:10px">
+          <input type="text" class="form-input" id="checkin-input" placeholder="Enter ticket number (TKT-XXXXXXXX)">
+          <button class="btn btn-primary" onclick="doCheckIn()">Check In</button>
+        </div>
+        <div id="checkin-result" style="margin-top:16px"></div>
+      </div>
+    </div>`;
+}
+
+async function doCheckIn() {
+  const ticket = document.getElementById('checkin-input').value.trim();
+  if (!ticket) return;
+  try {
+    const reg = await API.post('/registrations/checkin', { ticket_number: ticket });
+    document.getElementById('checkin-result').innerHTML = `
+      <div style="background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);border-radius:var(--radius);padding:16px">
+        <div style="color:var(--green);font-weight:700;font-size:16px">✅ Checked In Successfully!</div>
+        <div style="margin-top:8px;font-size:14px;color:var(--text-2)">
+          Attendee: <strong style="color:var(--text-1)">${reg.attendee?.full_name || 'N/A'}</strong><br>
+          Ticket: <code>${reg.ticket_number}</code>
+        </div>
+      </div>`;
+  } catch(err) {
+    document.getElementById('checkin-result').innerHTML = `
+      <div style="background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.3);border-radius:var(--radius);padding:16px;color:var(--red)">
+        ❌ ${err.message}
+      </div>`;
+  }
+}
+
+// ── ORGANIZER ─────────────────────────────────────────────────
+async function loadOrganizer() {
+  document.getElementById('dash-actions').innerHTML = `<a href="/create-event" class="btn btn-primary">➕ Create Event</a>`;
+  document.getElementById('dash-tabs').innerHTML = `
+    <button class="tab-btn active">My Events</button>
+    <button class="tab-btn" onclick="window.location='/checkin'">Check-In</button>`;
+  
+  try {
+    const d = await API.get('/dashboard/organizer');
+    document.getElementById('stats-row').innerHTML = `
+      ${statCard('📅', d.total_events, 'My Events', 'var(--blue)')}
+      ${statCard('🎟️', d.total_registrations, 'Registrations', 'var(--green)')}
+      ${statCard('💰', '$' + d.total_revenue.toFixed(2), 'Revenue', 'var(--yellow)')}
+      ${statCard('📊', d.total_events > 0 ? Math.round(d.total_registrations/d.total_events) : 0, 'Avg/Event', 'var(--purple)')}`;
+    
+    const rows = d.events.map(e => `
+      <tr>
+        <td><a href="/event/${e.id}" style="font-weight:600;color:var(--text-1)">${e.title.substring(0,40)}</a></td>
+        <td><span class="badge ${Utils.statusColor(e.status)}">${e.status}</span></td>
+        <td>${e.total_registrations}</td>
+        <td>${Utils.formatDate(e.start_datetime)}</td>
+        <td>
+          <div style="display:flex;gap:6px">
+            <a href="/event/${e.id}" class="btn btn-ghost btn-sm">View</a>
+            <a href="/edit-event/${e.id}" class="btn btn-ghost btn-sm">Edit</a>
+          </div>
+        </td>
+      </tr>`).join('') || '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-3)">No events yet. <a href="/create-event" style="color:var(--accent)">Create your first!</a></td></tr>';
+    
+    document.getElementById('dash-content').innerHTML = `
+      <div class="card">
+        <div style="padding:20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+          <div style="font-weight:700;font-size:16px">My Events</div>
+          <a href="/create-event" class="btn btn-primary btn-sm">+ New Event</a>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Event</th><th>Status</th><th>Registrations</th><th>Date</th><th>Actions</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>`;
+  } catch(err) { Toast.error('Failed to load dashboard'); }
+}
+
+// ── ATTENDEE ──────────────────────────────────────────────────
+async function loadAttendee() {
+  document.getElementById('dash-actions').innerHTML = `<a href="/events" class="btn btn-primary">🔍 Browse Events</a>`;
+  document.getElementById('dash-tabs').innerHTML = `
+    <button class="tab-btn active" onclick="showUpcoming()">Upcoming</button>
+    <button class="tab-btn" onclick="showPast()">Past Events</button>`;
+  
+  try {
+    const d = await API.get('/dashboard/attendee');
+    window._dashData = d;
+    
+    document.getElementById('stats-row').innerHTML = `
+      ${statCard('🎟️', d.upcoming_registrations.length, 'Upcoming Events', 'var(--blue)')}
+      ${statCard('✅', d.past_registrations.length, 'Events Attended', 'var(--green)')}
+      ${statCard('📅', d.upcoming_registrations.length + d.past_registrations.length, 'Total Registrations', 'var(--purple)')}
+      ${statCard('💳', '$' + [...d.upcoming_registrations, ...d.past_registrations].reduce((s,r) => s + r.amount_paid, 0).toFixed(2), 'Total Spent', 'var(--yellow)')}`;
+    
+    showUpcoming();
+  } catch(err) { Toast.error('Failed to load dashboard'); }
+}
+
+function showUpcoming() {
+  const regs = window._dashData?.upcoming_registrations || [];
+  renderRegistrations(regs, 'Upcoming Events', true);
+  document.querySelectorAll('.tab-btn')[0].classList.add('active');
+  document.querySelectorAll('.tab-btn')[1].classList.remove('active');
+}
+
+function showPast() {
+  const regs = window._dashData?.past_registrations || [];
+  renderRegistrations(regs, 'Past Events', false);
+  document.querySelectorAll('.tab-btn')[0].classList.remove('active');
+  document.querySelectorAll('.tab-btn')[1].classList.add('active');
+}
+
+function renderRegistrations(regs, title, showActions) {
+  if (regs.length === 0) {
+    document.getElementById('dash-content').innerHTML = `
+      <div class="empty-state">
+        <div class="icon">🎟️</div>
+        <h3>No ${title.toLowerCase()}</h3>
+        <p>Discover events and register to see them here.</p>
+        <a href="/events" class="btn btn-primary" style="margin-top:16px">Browse Events</a>
+      </div>`;
+    return;
+  }
+  
+  const cards = regs.map(r => `
+    <div class="card" style="overflow:visible">
+      <div class="card-body" style="display:flex;gap:16px;align-items:start">
+        <div style="font-size:36px">${r.event ? Utils.categoryEmoji(r.event.category) : '📅'}</div>
+        <div style="flex:1;min-width:0">
+          <a href="/event/${r.event_id}" style="font-weight:700;font-size:16px;color:var(--text-1)">${r.event?.title || 'Event #' + r.event_id}</a>
+          <div style="font-size:13px;color:var(--text-2);margin-top:4px">${r.event ? Utils.formatDateTime(r.event.start_datetime) : ''}</div>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+            <span class="badge badge-${r.status === 'confirmed' ? 'published' : r.status === 'waitlisted' ? 'draft' : r.status === 'checked_in' ? 'online' : 'cancelled'}">${r.status}</span>
+            <span class="badge" style="background:var(--bg-elevated)">🎫 ${r.ticket_number}</span>
+            ${r.amount_paid > 0 ? `<span class="badge" style="background:var(--bg-elevated)">💰 $${r.amount_paid.toFixed(2)}</span>` : '<span class="badge badge-free">FREE</span>'}
+          </div>
+        </div>
+        ${showActions ? `
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button onclick="viewTicket('${r.ticket_number}', '${r.qr_code_url || ''}')" class="btn btn-secondary btn-sm">🎟️ Ticket</button>
+          </div>` : ''}
+      </div>
+    </div>`).join('');
+  
+  document.getElementById('dash-content').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:14px">${cards}</div>`;
+}
+
+function viewTicket(ticketNum, qrUrl) {
+  openModal(`
+    <div class="modal-header">
+      <div class="modal-title">Your Ticket</div>
+      <button class="modal-close btn btn-ghost">✕</button>
+    </div>
+    <div class="modal-body" style="align-items:center">
+      <div class="qr-ticket" style="margin:0 auto">
+        ${qrUrl ? `<img src="${qrUrl}" alt="QR Code">` : '<div style="width:180px;height:180px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-size:48px;border-radius:8px">🎫</div>'}
+        <div style="font-weight:700;font-size:18px;margin-top:12px">EventFlow Ticket</div>
+        <div class="qr-ticket-num">${ticketNum}</div>
+      </div>
+      <p style="text-align:center;color:var(--text-2);font-size:13px">Show this QR code at the event for check-in</p>
+    </div>`, null);
+}
+
+function recentEventRow(e) {
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border)">
+      <div>
+        <a href="/event/${e.id}" style="font-weight:600;font-size:14px;color:var(--text-1)">${e.title.substring(0,30)}</a>
+        <div style="font-size:12px;color:var(--text-3)">${Utils.formatDate(e.start_datetime)}</div>
+      </div>
+      <span class="badge ${Utils.statusColor(e.status)}">${e.status}</span>
+    </div>`;
+}
+
+function statCard(icon, value, label, color) {
+  return `
+    <div class="stat-card">
+      <div class="stat-icon" style="background:${color}20">${icon}</div>
+      <div class="stat-value">${value}</div>
+      <div class="stat-label">${label}</div>
+    </div>`;
+}
+
+init();
+</script>
+</body>
+</html>

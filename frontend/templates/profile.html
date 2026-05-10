@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile — EventFlow</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+<nav class="navbar">
+  <div class="container">
+    <a href="/" class="nav-logo">⚡ Event<span>Flow</span></a>
+    <div class="nav-links"><a href="/">Discover</a><a href="/events">Browse All</a></div>
+    <div class="nav-right" id="nav-right"></div>
+  </div>
+</nav>
+
+<div style="padding:40px 0 80px">
+  <div class="container-sm">
+    <div style="margin-bottom:32px">
+      <a href="/dashboard" style="color:var(--text-3);font-size:14px">← Dashboard</a>
+      <h1 style="font-family:var(--font-display);font-size:32px;font-weight:800;margin-top:12px">My Profile</h1>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 2fr;gap:24px;align-items:start">
+      <!-- Avatar card -->
+      <div class="card">
+        <div class="card-body" style="text-align:center">
+          <div id="avatar-wrap" style="width:96px;height:96px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:700;margin:0 auto 16px;overflow:hidden;cursor:pointer;position:relative" onclick="document.getElementById('avatar-file').click()">
+            <span id="avatar-initials"></span>
+            <img id="avatar-img" style="display:none;width:100%;height:100%;object-fit:cover">
+            <div style="position:absolute;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;opacity:0;transition:var(--transition)" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0">
+              <span style="color:white;font-size:13px;font-weight:600">Change</span>
+            </div>
+          </div>
+          <input type="file" id="avatar-file" accept="image/*" style="display:none" onchange="uploadAvatar(this)">
+          <div style="font-weight:700;font-size:16px" id="profile-name">—</div>
+          <div style="font-size:13px;color:var(--text-3);margin-top:4px" id="profile-role"></div>
+          <div style="font-size:13px;color:var(--text-2);margin-top:8px" id="profile-email"></div>
+          <div style="margin-top:12px">
+            <span class="badge badge-category" id="profile-badge"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edit form -->
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div class="card">
+          <div style="padding:20px 24px;border-bottom:1px solid var(--border);font-weight:700">Personal Information</div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:16px">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Full Name</label>
+                <input type="text" class="form-input" id="full_name">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Username</label>
+                <input type="text" class="form-input" id="username" disabled style="opacity:0.5">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-input" id="email" disabled style="opacity:0.5">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Phone</label>
+              <input type="tel" class="form-input" id="phone" placeholder="+1 234 567 8900">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Bio</label>
+              <textarea class="form-textarea" id="bio" rows="3" placeholder="Tell others about yourself..."></textarea>
+            </div>
+            <div style="display:flex;justify-content:flex-end">
+              <button class="btn btn-primary" onclick="saveProfile()" id="save-btn">Save Changes</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="padding:20px 24px;border-bottom:1px solid var(--border);font-weight:700">Change Password</div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:14px">
+            <div class="form-group">
+              <label class="form-label">Current Password</label>
+              <input type="password" class="form-input" id="cur-pw" placeholder="••••••••">
+            </div>
+            <div class="form-group">
+              <label class="form-label">New Password</label>
+              <input type="password" class="form-input" id="new-pw" placeholder="At least 6 characters">
+            </div>
+            <div style="display:flex;justify-content:flex-end">
+              <button class="btn btn-secondary" onclick="changePassword()">Update Password</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="card">
+          <div style="padding:20px 24px;border-bottom:1px solid var(--border);font-weight:700">Account Stats</div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px" id="profile-stats">
+              <div class="page-loader"><div class="spinner"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script>
+if (!Auth.require()) throw new Error();
+
+async function loadProfile() {
+  try {
+    const user = await API.get('/auth/me');
+    API.setUser(user);
+    document.getElementById('full_name').value = user.full_name;
+    document.getElementById('username').value = user.username;
+    document.getElementById('email').value = user.email;
+    document.getElementById('phone').value = user.phone || '';
+    document.getElementById('bio').value = user.bio || '';
+    document.getElementById('profile-name').textContent = user.full_name;
+    document.getElementById('profile-email').textContent = user.email;
+    document.getElementById('profile-role').textContent = `Member since ${Utils.formatDate(user.created_at)}`;
+    document.getElementById('profile-badge').textContent = user.role;
+
+    const initials = user.full_name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2);
+    document.getElementById('avatar-initials').textContent = initials;
+
+    if (user.avatar_url) {
+      document.getElementById('avatar-img').src = user.avatar_url;
+      document.getElementById('avatar-img').style.display = 'block';
+      document.getElementById('avatar-initials').style.display = 'none';
+    }
+
+    loadStats(user);
+  } catch(err) { Toast.error('Failed to load profile'); }
+}
+
+async function loadStats(user) {
+  try {
+    const regs = await API.get('/registrations/my');
+    const upcoming = regs.filter(r => r.event && new Date(r.event.start_datetime) >= new Date()).length;
+    const past = regs.filter(r => r.event && new Date(r.event.start_datetime) < new Date()).length;
+    document.getElementById('profile-stats').innerHTML = `
+      <div style="text-align:center">
+        <div style="font-family:var(--font-display);font-size:28px;font-weight:800">${regs.length}</div>
+        <div style="font-size:13px;color:var(--text-2)">Total Tickets</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-family:var(--font-display);font-size:28px;font-weight:800">${upcoming}</div>
+        <div style="font-size:13px;color:var(--text-2)">Upcoming</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-family:var(--font-display);font-size:28px;font-weight:800">${past}</div>
+        <div style="font-size:13px;color:var(--text-2)">Attended</div>
+      </div>`;
+  } catch {}
+}
+
+async function saveProfile() {
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true; btn.innerHTML = '<div class="spinner"></div>';
+  try {
+    const payload = {
+      full_name: document.getElementById('full_name').value,
+      phone: document.getElementById('phone').value || null,
+      bio: document.getElementById('bio').value || null,
+    };
+    await API.put('/auth/me', payload);
+    Toast.success('Profile updated!');
+    const user = API.getUser();
+    if (user) { user.full_name = payload.full_name; API.setUser(user); }
+  } catch(err) { Toast.error(err.message); }
+  btn.disabled = false; btn.textContent = 'Save Changes';
+}
+
+async function changePassword() {
+  const cur = document.getElementById('cur-pw').value;
+  const nw = document.getElementById('new-pw').value;
+  if (!cur || !nw) { Toast.info('Fill in both fields'); return; }
+  if (nw.length < 6) { Toast.error('Password must be at least 6 characters'); return; }
+  try {
+    await API.post('/auth/change-password', { current_password: cur, new_password: nw });
+    Toast.success('Password changed!');
+    document.getElementById('cur-pw').value = '';
+    document.getElementById('new-pw').value = '';
+  } catch(err) { Toast.error(err.message); }
+}
+
+async function uploadAvatar(input) {
+  if (!input.files[0]) return;
+  const formData = new FormData();
+  formData.append('file', input.files[0]);
+  try {
+    const res = await API.postForm('/users/avatar', formData);
+    document.getElementById('avatar-img').src = res.avatar_url;
+    document.getElementById('avatar-img').style.display = 'block';
+    document.getElementById('avatar-initials').style.display = 'none';
+    Toast.success('Avatar updated!');
+    const user = API.getUser();
+    if (user) { user.avatar_url = res.avatar_url; API.setUser(user); }
+  } catch(err) { Toast.error(err.message); }
+}
+
+document.addEventListener('DOMContentLoaded', loadProfile);
+</script>
+</body>
+</html>

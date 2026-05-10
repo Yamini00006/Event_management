@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EventFlow — Discover & Create Amazing Events</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="container">
+    <a href="/" class="nav-logo">⚡ Event<span>Flow</span></a>
+    <div class="nav-links">
+      <a href="/" class="active">Discover</a>
+      <a href="/events">Browse All</a>
+      <a href="/create-event">Create Event</a>
+    </div>
+    <div class="nav-right" id="nav-right"></div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-eyebrow">
+      <span class="dot"></span>
+      <span>Thousands of events happening now</span>
+    </div>
+    <h1>Where <em>great moments</em><br>come to life</h1>
+    <p>Discover, create, and manage world-class events. From intimate workshops to massive conferences — all in one platform.</p>
+    <div class="hero-actions">
+      <a href="/events" class="btn btn-primary btn-lg">Explore Events</a>
+      <a href="/register" class="btn btn-secondary btn-lg" id="hero-create-btn">Host an Event</a>
+    </div>
+    <div class="hero-stats" id="hero-stats">
+      <div>
+        <div class="hero-stat-num" id="stat-events">—</div>
+        <div class="hero-stat-label">Events hosted</div>
+      </div>
+      <div>
+        <div class="hero-stat-num" id="stat-users">—</div>
+        <div class="hero-stat-label">Community members</div>
+      </div>
+      <div>
+        <div class="hero-stat-num" id="stat-registrations">—</div>
+        <div class="hero-stat-label">Tickets issued</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Featured Events -->
+<section class="section" style="padding-top:0">
+  <div class="container">
+    <div class="section-header">
+      <div>
+        <div class="section-title">Featured Events</div>
+        <div class="section-sub">Handpicked experiences not to be missed</div>
+      </div>
+      <a href="/events?featured=true" class="btn btn-ghost">View all →</a>
+    </div>
+    <div class="events-grid" id="featured-grid">
+      <div class="page-loader"><div class="spinner"></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- Browse by Category -->
+<section class="section" style="background: var(--bg-card); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+  <div class="container">
+    <div class="section-header">
+      <div>
+        <div class="section-title">Browse by Category</div>
+        <div class="section-sub">Find exactly what you're looking for</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px" id="category-grid"></div>
+  </div>
+</section>
+
+<!-- Upcoming Events -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <div>
+        <div class="section-title">Upcoming Events</div>
+        <div class="section-sub">Don't miss what's happening soon</div>
+      </div>
+      <a href="/events" class="btn btn-ghost">View all →</a>
+    </div>
+    
+    <!-- Quick Filters -->
+    <div class="filters" style="margin-bottom:28px">
+      <input type="text" class="filter-input" id="search-input" placeholder="🔍  Search events...">
+      <select class="filter-select" id="cat-filter">
+        <option value="">All Categories</option>
+        <option value="conference">Conference</option>
+        <option value="workshop">Workshop</option>
+        <option value="concert">Concert</option>
+        <option value="meetup">Meetup</option>
+        <option value="webinar">Webinar</option>
+        <option value="sports">Sports</option>
+        <option value="arts">Arts</option>
+        <option value="networking">Networking</option>
+      </select>
+      <select class="filter-select" id="type-filter">
+        <option value="">In-Person & Online</option>
+        <option value="online">Online Only</option>
+        <option value="inperson">In-Person Only</option>
+      </select>
+      <select class="filter-select" id="price-filter">
+        <option value="">Free & Paid</option>
+        <option value="free">Free</option>
+        <option value="paid">Paid</option>
+      </select>
+    </div>
+    
+    <div class="events-grid" id="upcoming-grid">
+      <div class="page-loader"><div class="spinner"></div></div>
+    </div>
+    
+    <div id="load-more-wrap" style="text-align:center;margin-top:32px;display:none">
+      <button class="btn btn-secondary" id="load-more-btn">Load More Events</button>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="section" style="background: linear-gradient(135deg, rgba(255,107,53,0.08) 0%, rgba(79,142,247,0.05) 100%); border-top: 1px solid var(--border);">
+  <div class="container" style="text-align:center">
+    <div style="font-size:48px;margin-bottom:20px">⚡</div>
+    <h2 style="font-family:var(--font-display);font-size:36px;font-weight:800;margin-bottom:16px">Ready to create your next event?</h2>
+    <p style="color:var(--text-2);font-size:16px;max-width:480px;margin:0 auto 32px">Join thousands of organizers who trust EventFlow to power their events. Get started in minutes.</p>
+    <div style="display:flex;gap:12px;justify-content:center">
+      <a href="/register" class="btn btn-primary btn-lg">Start for Free</a>
+      <a href="/events" class="btn btn-secondary btn-lg">Browse Events</a>
+    </div>
+  </div>
+</section>
+
+<footer style="background:var(--bg-card);border-top:1px solid var(--border);padding:40px 0;margin-top:0">
+  <div class="container" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px">
+    <div class="nav-logo">⚡ Event<span>Flow</span></div>
+    <div style="color:var(--text-3);font-size:13px">© 2026 EventFlow. All rights reserved.</div>
+  </div>
+</footer>
+
+<script src="/static/js/app.js"></script>
+<script>
+const categories = [
+  { id:'conference', emoji:'🎤', label:'Conference' },
+  { id:'workshop', emoji:'🛠️', label:'Workshop' },
+  { id:'concert', emoji:'🎵', label:'Concert' },
+  { id:'meetup', emoji:'☕', label:'Meetup' },
+  { id:'webinar', emoji:'💻', label:'Webinar' },
+  { id:'sports', emoji:'⚽', label:'Sports' },
+  { id:'arts', emoji:'🎨', label:'Arts' },
+  { id:'networking', emoji:'🤝', label:'Networking' },
+];
+
+let currentPage = 1;
+let totalPages = 1;
+let currentFilters = {};
+
+async function loadStats() {
+  try {
+    const res = await fetch('/api/events?per_page=1');
+    const data = await res.json();
+    document.getElementById('stat-events').textContent = data.total + '+';
+    document.getElementById('stat-users').textContent = '500+';
+    document.getElementById('stat-registrations').textContent = (data.total * 12) + '+';
+  } catch {}
+}
+
+async function loadFeatured() {
+  try {
+    const events = await API.get('/events/featured');
+    const grid = document.getElementById('featured-grid');
+    if (events.length === 0) {
+      grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="icon">🌟</div><p>No featured events yet</p></div>';
+      return;
+    }
+    grid.innerHTML = events.map(e => Utils.eventCardHTML(e)).join('');
+  } catch(err) {
+    document.getElementById('featured-grid').innerHTML = '<p style="color:var(--red)">Error loading events</p>';
+  }
+}
+
+async function loadUpcoming(append = false) {
+  if (!append) currentPage = 1;
+  const filters = { ...currentFilters, page: currentPage, per_page: 6 };
+  const params = new URLSearchParams(filters);
+  
+  try {
+    const data = await API.get(`/events?${params}`);
+    const grid = document.getElementById('upcoming-grid');
+    
+    if (!append) {
+      grid.innerHTML = data.items.length === 0 
+        ? '<div class="empty-state" style="grid-column:1/-1"><div class="icon">📅</div><h3>No events found</h3><p>Try adjusting your filters</p></div>'
+        : data.items.map(e => Utils.eventCardHTML(e)).join('');
+    } else {
+      grid.insertAdjacentHTML('beforeend', data.items.map(e => Utils.eventCardHTML(e)).join(''));
+    }
+    
+    totalPages = data.pages;
+    const wrap = document.getElementById('load-more-wrap');
+    wrap.style.display = currentPage < totalPages ? 'block' : 'none';
+  } catch(err) {
+    document.getElementById('upcoming-grid').innerHTML = '<p style="color:var(--red)">Error loading events</p>';
+  }
+}
+
+function renderCategories() {
+  document.getElementById('category-grid').innerHTML = categories.map(c => `
+    <a href="/events?category=${c.id}" 
+       style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:20px 16px;text-align:center;transition:var(--transition);display:block;"
+       onmouseover="this.style.borderColor='var(--accent)';this.style.background='var(--accent-glow)'"
+       onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--bg-elevated)'">
+      <div style="font-size:28px;margin-bottom:8px">${c.emoji}</div>
+      <div style="font-size:13px;font-weight:600">${c.label}</div>
+    </a>`).join('');
+}
+
+// Filters
+const debouncedSearch = Utils.debounce(() => { currentFilters.search = document.getElementById('search-input').value || undefined; loadUpcoming(); }, 400);
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadStats(); loadFeatured(); loadUpcoming(); renderCategories();
+  
+  // Update hero CTA if logged in
+  const user = Auth.getUser();
+  if (user && (user.role === 'organizer' || user.role === 'admin')) {
+    document.getElementById('hero-create-btn').href = '/create-event';
+    document.getElementById('hero-create-btn').textContent = 'Create Event';
+  }
+  
+  document.getElementById('search-input').addEventListener('input', debouncedSearch);
+  
+  document.getElementById('cat-filter').addEventListener('change', e => {
+    currentFilters.category = e.target.value || undefined;
+    loadUpcoming();
+  });
+  document.getElementById('type-filter').addEventListener('change', e => {
+    if (e.target.value === 'online') currentFilters.is_online = true;
+    else if (e.target.value === 'inperson') currentFilters.is_online = false;
+    else delete currentFilters.is_online;
+    loadUpcoming();
+  });
+  document.getElementById('price-filter').addEventListener('change', e => {
+    if (e.target.value === 'free') currentFilters.is_free = true;
+    else if (e.target.value === 'paid') currentFilters.is_free = false;
+    else delete currentFilters.is_free;
+    loadUpcoming();
+  });
+  
+  document.getElementById('load-more-btn').addEventListener('click', () => {
+    currentPage++;
+    loadUpcoming(true);
+  });
+  
+  // URL params
+  const url = new URLSearchParams(window.location.search);
+  if (url.get('category')) {
+    currentFilters.category = url.get('category');
+    document.getElementById('cat-filter').value = url.get('category');
+  }
+});
+</script>
+</body>
+</html>

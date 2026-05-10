@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check-In — EventFlow</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+<nav class="navbar">
+  <div class="container">
+    <a href="/" class="nav-logo">⚡ Event<span>Flow</span></a>
+    <div class="nav-links"><a href="/">Discover</a><a href="/dashboard">Dashboard</a></div>
+    <div class="nav-right" id="nav-right"></div>
+  </div>
+</nav>
+
+<div style="padding:40px 0 80px">
+  <div class="container-sm">
+    <div style="margin-bottom:32px">
+      <a href="/dashboard" style="color:var(--text-3);font-size:14px">← Dashboard</a>
+      <h1 style="font-family:var(--font-display);font-size:32px;font-weight:800;margin-top:12px">Event Check-In 📲</h1>
+      <p style="color:var(--text-2);margin-top:6px">Verify and check in attendees by ticket number or QR scan</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px">
+      <!-- Manual search -->
+      <div class="card">
+        <div style="padding:20px 24px;border-bottom:1px solid var(--border);font-weight:700;font-size:16px">🔍 Manual Lookup</div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:14px">
+          <div class="form-group">
+            <label class="form-label">Ticket Number</label>
+            <input type="text" class="form-input" id="ticket-input" placeholder="TKT-XXXXXXXX" style="font-family:monospace;font-size:16px;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+          </div>
+          <button class="btn btn-primary" onclick="doCheckIn()" id="checkin-btn">✅ Check In</button>
+        </div>
+      </div>
+
+      <!-- QR Scanner placeholder -->
+      <div class="card">
+        <div style="padding:20px 24px;border-bottom:1px solid var(--border);font-weight:700;font-size:16px">📷 QR Scanner</div>
+        <div class="card-body" style="text-align:center">
+          <div style="width:100%;height:140px;background:var(--bg-elevated);border-radius:var(--radius);border:2px dashed var(--border-strong);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer" onclick="startQRScan()">
+            <div style="font-size:40px;margin-bottom:8px">📷</div>
+            <div style="font-size:14px;color:var(--text-2)">Click to open camera</div>
+            <div style="font-size:12px;color:var(--text-3);margin-top:4px">Scan attendee's QR ticket</div>
+          </div>
+          <div id="qr-input-wrap" style="margin-top:12px;display:none">
+            <input type="text" class="form-input" id="qr-manual" placeholder="Paste QR data here">
+            <button class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%" onclick="processQRData()">Process</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div id="checkin-result" style="margin-bottom:28px"></div>
+
+    <!-- Recent check-ins -->
+    <div class="card">
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:700;font-size:16px">Recent Check-Ins</div>
+        <span class="badge badge-category" id="checkin-count">0 today</span>
+      </div>
+      <div id="recent-checkins" style="min-height:80px;display:flex;align-items:center;justify-content:center;color:var(--text-3);font-size:14px">
+        No check-ins yet today
+      </div>
+    </div>
+
+    <!-- Select event for stats -->
+    <div class="card" style="margin-top:20px">
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);font-weight:700;font-size:16px">📊 Event Attendance</div>
+      <div class="card-body">
+        <div class="form-group" style="margin-bottom:16px">
+          <label class="form-label">Select Event</label>
+          <select class="form-select form-input" id="event-select" onchange="loadEventStats()">
+            <option value="">-- Select an event --</option>
+          </select>
+        </div>
+        <div id="event-stats" style="display:none">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+            <div style="text-align:center;background:var(--bg-elevated);border-radius:var(--radius);padding:16px">
+              <div style="font-family:var(--font-display);font-size:28px;font-weight:800;color:var(--green)" id="stat-checkedin">0</div>
+              <div style="font-size:13px;color:var(--text-2)">Checked In</div>
+            </div>
+            <div style="text-align:center;background:var(--bg-elevated);border-radius:var(--radius);padding:16px">
+              <div style="font-family:var(--font-display);font-size:28px;font-weight:800;color:var(--blue)" id="stat-confirmed">0</div>
+              <div style="font-size:13px;color:var(--text-2)">Confirmed</div>
+            </div>
+            <div style="text-align:center;background:var(--bg-elevated);border-radius:var(--radius);padding:16px">
+              <div style="font-family:var(--font-display);font-size:28px;font-weight:800;color:var(--accent)">%<span id="stat-pct">0</span></div>
+              <div style="font-size:13px;color:var(--text-2)">Attendance Rate</div>
+            </div>
+          </div>
+          <div class="table-wrap" style="margin-top:16px" id="reg-table-wrap"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script>
+if (!Auth.require()) throw new Error();
+const user = Auth.getUser();
+if (user.role === 'attendee') { Toast.error('Organizer access required'); window.location.href='/dashboard'; }
+
+const recentCheckins = [];
+
+async function doCheckIn() {
+  const ticket = document.getElementById('ticket-input').value.trim();
+  if (!ticket) { Toast.info('Enter a ticket number'); return; }
+  const btn = document.getElementById('checkin-btn');
+  btn.disabled = true; btn.innerHTML = '<div class="spinner"></div>';
+
+  try {
+    const reg = await API.post('/registrations/checkin', { ticket_number: ticket });
+    showResult(reg, true);
+    document.getElementById('ticket-input').value = '';
+    addRecentCheckin(reg);
+  } catch(err) {
+    showResult(null, false, err.message);
+  }
+  btn.disabled = false; btn.textContent = '✅ Check In';
+}
+
+function showResult(reg, success, errMsg = '') {
+  const el = document.getElementById('checkin-result');
+  if (success) {
+    el.innerHTML = `
+      <div style="background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);border-radius:var(--radius-lg);padding:24px;animation:slideUp 0.2s ease">
+        <div style="display:flex;align-items:center;gap:16px">
+          <div style="font-size:48px">✅</div>
+          <div>
+            <div style="color:var(--green);font-family:var(--font-display);font-size:20px;font-weight:800">Check-In Successful!</div>
+            <div style="font-size:16px;font-weight:600;margin-top:4px">${reg.attendee?.full_name || 'Attendee'}</div>
+            <div style="font-size:13px;color:var(--text-2);margin-top:2px">${reg.ticket_number} · ${reg.ticket_tier?.name || ''}</div>
+            <div style="font-size:12px;color:var(--text-3);margin-top:4px">Checked in at ${new Date().toLocaleTimeString()}</div>
+          </div>
+        </div>
+      </div>`;
+    setTimeout(() => el.innerHTML = '', 5000);
+  } else {
+    el.innerHTML = `
+      <div style="background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.3);border-radius:var(--radius-lg);padding:20px;animation:slideUp 0.2s ease">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="font-size:36px">❌</div>
+          <div>
+            <div style="color:var(--red);font-weight:700;font-size:16px">Check-In Failed</div>
+            <div style="font-size:14px;color:var(--text-2);margin-top:4px">${errMsg}</div>
+          </div>
+        </div>
+      </div>`;
+    setTimeout(() => el.innerHTML = '', 4000);
+  }
+}
+
+function addRecentCheckin(reg) {
+  recentCheckins.unshift(reg);
+  document.getElementById('checkin-count').textContent = `${recentCheckins.length} today`;
+  const el = document.getElementById('recent-checkins');
+  el.innerHTML = `
+    <div style="width:100%">
+      ${recentCheckins.slice(0,8).map(r => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border)">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="nav-avatar" style="width:32px;height:32px;font-size:13px">${r.attendee?.full_name?.charAt(0)||'?'}</div>
+            <div>
+              <div style="font-weight:600;font-size:14px">${r.attendee?.full_name||'Attendee'}</div>
+              <div style="font-size:12px;color:var(--text-3)">${r.ticket_number}</div>
+            </div>
+          </div>
+          <span style="color:var(--green);font-size:12px">✓ Just now</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+function startQRScan() {
+  document.getElementById('qr-input-wrap').style.display = 'block';
+  Toast.info('Camera QR scanning requires HTTPS. Enter QR data manually below.');
+}
+
+function processQRData() {
+  const data = document.getElementById('qr-manual').value.trim();
+  if (!data) return;
+  // Parse format: TICKET:TKT-XXXXXXXX:EVENT:N
+  const parts = data.split(':');
+  if (parts[0] === 'TICKET' && parts[1]) {
+    document.getElementById('ticket-input').value = parts[1];
+    doCheckIn();
+  } else {
+    document.getElementById('ticket-input').value = data;
+    doCheckIn();
+  }
+}
+
+// Enter key support
+document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('ticket-input').addEventListener('keydown', e => { if (e.key === 'Enter') doCheckIn(); });
+
+  // Load organizer's events
+  try {
+    const data = await API.get('/events?organizer_id=' + user.id + '&per_page=50');
+    const sel = document.getElementById('event-select');
+    data.items.forEach(e => {
+      const opt = document.createElement('option');
+      opt.value = e.id;
+      opt.textContent = `${e.title} (${Utils.formatDate(e.start_datetime)})`;
+      sel.appendChild(opt);
+    });
+  } catch {}
+});
+
+async function loadEventStats() {
+  const eventId = document.getElementById('event-select').value;
+  if (!eventId) { document.getElementById('event-stats').style.display = 'none'; return; }
+  try {
+    const regs = await API.get(`/registrations/event/${eventId}`);
+    const checkedIn = regs.filter(r => r.status === 'checked_in').length;
+    const confirmed = regs.filter(r => r.status === 'confirmed' || r.status === 'checked_in').length;
+    const pct = confirmed > 0 ? Math.round((checkedIn / confirmed) * 100) : 0;
+
+    document.getElementById('stat-checkedin').textContent = checkedIn;
+    document.getElementById('stat-confirmed').textContent = confirmed;
+    document.getElementById('stat-pct').textContent = pct;
+    document.getElementById('event-stats').style.display = 'block';
+
+    const rows = regs.slice(0,20).map(r => `
+      <tr>
+        <td>${r.attendee?.full_name||'?'}</td>
+        <td style="font-family:monospace;font-size:12px">${r.ticket_number}</td>
+        <td>${r.ticket_tier?.name||''}</td>
+        <td><span class="badge badge-${r.status==='checked_in'?'published':r.status==='confirmed'?'online':'cancelled'}">${r.status.replace('_',' ')}</span></td>
+        <td>${r.checked_in_at ? new Date(r.checked_in_at).toLocaleTimeString() : '—'}</td>
+      </tr>`).join('');
+
+    document.getElementById('reg-table-wrap').innerHTML = `
+      <table>
+        <thead><tr><th>Name</th><th>Ticket</th><th>Type</th><th>Status</th><th>Check-in Time</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  } catch(err) { Toast.error('Failed to load stats'); }
+}
+</script>
+</body>
+</html>

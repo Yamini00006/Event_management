@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Event — EventFlow</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+<nav class="navbar">
+  <div class="container">
+    <a href="/" class="nav-logo">⚡ Event<span>Flow</span></a>
+    <div class="nav-links">
+      <a href="/">Discover</a><a href="/events">Browse All</a><a href="/create-event">Create Event</a>
+    </div>
+    <div class="nav-right" id="nav-right"></div>
+  </div>
+</nav>
+
+<div id="page-content"><div class="page-loader" style="min-height:60vh"><div class="spinner"></div></div></div>
+
+<script src="/static/js/app.js"></script>
+<script>
+const eventId = window.location.pathname.split('/').pop();
+let currentEvent = null;
+let selectedTierId = null;
+
+async function loadEvent() {
+  try {
+    const event = await API.get(`/events/${eventId}`);
+    currentEvent = event;
+    document.title = `${event.title} — EventFlow`;
+    renderEvent(event);
+    loadComments();
+  } catch(err) {
+    document.getElementById('page-content').innerHTML = `
+      <div class="empty-state" style="min-height:60vh;display:flex;flex-direction:column;align-items:center;justify-content:center">
+        <div class="icon">🔍</div><h3>Event not found</h3>
+        <a href="/events" class="btn btn-primary" style="margin-top:16px">Browse Events</a>
+      </div>`;
+  }
+}
+
+function renderEvent(e) {
+  const user = Auth.getUser();
+  const isOrganizer = user && (user.id === e.organizer_id || user.role === 'admin');
+  const emoji = Utils.categoryEmoji(e.category);
+  const loc = e.is_online ? '🌐 Online Event' : [e.venue_name, e.venue_city, e.venue_country].filter(Boolean).join(', ');
+  const hasPaid = e.ticket_tiers.some(t => t.price > 0);
+
+  const coverHTML = e.cover_image_url
+    ? `<img src="${e.cover_image_url}" alt="${e.title}" style="width:100%;height:420px;object-fit:cover;border-radius:var(--radius-lg);display:block">`
+    : `<div style="width:100%;height:420px;background:linear-gradient(135deg,var(--bg-elevated) 0%,#1e2330 100%);border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;font-size:96px">${emoji}</div>`;
+
+  const tiersHTML = e.ticket_tiers.length === 0
+    ? `<div style="color:var(--text-2);font-size:14px;text-align:center;padding:20px">No tickets configured</div>`
+    : e.ticket_tiers.map(t => {
+        const avail = t.capacity !== null ? t.capacity - t.sold_count : null;
+        const soldOut = avail !== null && avail <= 0;
+        return `
+        <div class="ticket-tier-option ${soldOut?'':'cursor-pointer'}" data-tier-id="${t.id}" onclick="selectTier(${t.id})" style="${soldOut?'opacity:0.5;cursor:not-allowed':'cursor:pointer'}">
+          <div style="display:flex;justify-content:space-between;align-items:start">
+            <div>
+              <div class="ticket-tier-name">${t.name}</div>
+              ${t.description?`<div style="font-size:13px;color:var(--text-2);margin-top:4px">${t.description}</div>`:''}
+              ${avail !== null ? `<div style="font-size:12px;color:${avail<=5?'var(--red)':'var(--text-3)'};margin-top:6px">${soldOut?'Sold Out':`${avail} left`}</div>` : ''}
+              ${t.waitlist_count>0?`<div style="font-size:12px;color:var(--yellow);margin-top:2px">+${t.waitlist_count} on waitlist</div>`:''}
+            </div>
+            <div class="ticket-tier-price">${t.price===0?'<span style="color:var(--green);font-size:16px">FREE</span>':'$'+t.price.toFixed(2)}</div>
+          </div>
+        </div>`;
+      }).join('');
+
+  const actionHTML = (() => {
+    if (isOrganizer) return `<a href="/edit-event/${e.id}" class="btn btn-secondary" style="width:100%">✏️ Edit Event</a>`;
+    if (e.status !== 'published') return `<div style="text-align:center;color:var(--text-3);font-size:14px">This event is not accepting registrations</div>`;
+    if (!Auth.isLoggedIn()) return `<a href="/login" class="btn btn-primary" style="width:100%">Sign in to Register</a>`;
+    return `<button class="btn btn-primary" style="width:100%" id="register-btn" onclick="registerForEvent()">Register Now</button>`;
+  })();
+
+  document.getElementById('page-content').innerHTML = `
+    <div style="padding:32px 0 64px">
+      <div class="container">
+        <div style="margin-bottom:8px"><a href="/events" style="color:var(--text-3);font-size:14px">← Back to Events</a></div>
+        ${coverHTML}
+        <div class="event-detail-layout">
+          <!-- Left -->
+          <div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin:24px 0 16px">
+              <span class="badge badge-category">${e.category}</span>
+              <span class="badge ${Utils.statusColor(e.status)}">${e.status}</span>
+              ${e.is_online?'<span class="badge badge-online">Online</span>':''}
+              ${e.is_featured?'<span class="badge badge-featured">⭐ Featured</span>':''}
+            </div>
+            <h1 style="font-family:var(--font-display);font-size:clamp(24px,4vw,40px);font-weight:800;line-height:1.15;margin-bottom:20px">${e.title}</h1>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:28px">
+              ${infoBox('📅','Date & Time',Utils.formatDateTime(e.start_datetime)+'<br><span style="color:var(--text-3);font-size:12px">Ends '+Utils.formatDateTime(e.end_datetime)+'</span>')}
+              ${infoBox('📍','Location',loc)}
+              ${infoBox('👥','Attendees',`<strong>${e.total_registrations}</strong> registered`)}
+              ${infoBox('🎤','Organizer',e.organizer?.full_name||'Unknown')}
+            </div>
+
+            ${e.description?`
+              <div style="margin-bottom:32px">
+                <h2 style="font-family:var(--font-display);font-size:20px;font-weight:700;margin-bottom:14px">About this event</h2>
+                <div style="color:var(--text-2);line-height:1.8;white-space:pre-wrap">${e.description}</div>
+              </div>`:''}
+
+            ${e.tags?.length?`
+              <div style="margin-bottom:32px">
+                <div style="font-weight:600;margin-bottom:10px">Tags</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">${e.tags.map(t=>`<span class="badge" style="background:var(--bg-elevated)">#${t}</span>`).join('')}</div>
+              </div>`:''}
+
+            <!-- Share -->
+            <div style="margin-bottom:32px;display:flex;gap:10px">
+              <button onclick="Utils.copyText(window.location.href)" class="btn btn-secondary btn-sm">🔗 Copy Link</button>
+              ${isOrganizer?`<button onclick="deleteEvent()" class="btn btn-danger btn-sm">🗑️ Delete Event</button>`:''}
+            </div>
+
+            <!-- Comments -->
+            <div>
+              <h2 style="font-family:var(--font-display);font-size:20px;font-weight:700;margin-bottom:20px">Questions & Comments</h2>
+              ${Auth.isLoggedIn()?`
+                <div style="margin-bottom:24px">
+                  <textarea class="form-textarea" id="comment-text" placeholder="Ask a question or leave a comment..." style="min-height:80px"></textarea>
+                  <div style="display:flex;gap:10px;margin-top:10px;align-items:center">
+                    <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-2);cursor:pointer">
+                      <input type="checkbox" id="is-question"> Mark as question
+                    </label>
+                    <button class="btn btn-primary btn-sm" onclick="postComment()">Post</button>
+                  </div>
+                </div>`:`<p style="color:var(--text-2);font-size:14px;margin-bottom:20px"><a href="/login" style="color:var(--accent)">Sign in</a> to ask questions or comment.</p>`}
+              <div id="comments-list"><div class="spinner"></div></div>
+            </div>
+          </div>
+
+          <!-- Right: Ticket Card -->
+          <div>
+            <div class="ticket-card">
+              <div style="font-family:var(--font-display);font-size:18px;font-weight:700;margin-bottom:4px">Get Tickets</div>
+              <div style="font-size:13px;color:var(--text-2);margin-bottom:20px">${hasPaid?'Select your ticket type':'Free event'}</div>
+              <div id="tier-options">${tiersHTML}</div>
+              <div style="margin-top:20px">${actionHTML}</div>
+              ${e.ticket_tiers.some(t=>t.capacity!==null)?`<div style="margin-top:12px;font-size:12px;color:var(--text-3);text-align:center">Limited capacity — register early</div>`:''}
+            </div>
+
+            <!-- Organizer card -->
+            <div class="card" style="margin-top:16px">
+              <div class="card-body">
+                <div style="font-weight:600;margin-bottom:12px">Event Organizer</div>
+                <div style="display:flex;align-items:center;gap:12px">
+                  <div class="nav-avatar" style="width:44px;height:44px;font-size:18px">${e.organizer?.full_name?.charAt(0)||'?'}</div>
+                  <div>
+                    <div style="font-weight:600">${e.organizer?.full_name||'Unknown'}</div>
+                    <div style="font-size:13px;color:var(--text-2)">${e.organizer?.bio?.substring(0,80)||'Event Organizer'}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function infoBox(icon, label, value) {
+  return `<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:16px">
+    <div style="font-size:20px;margin-bottom:6px">${icon}</div>
+    <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">${label}</div>
+    <div style="font-size:14px;color:var(--text-1)">${value}</div>
+  </div>`;
+}
+
+function selectTier(tierId) {
+  selectedTierId = tierId;
+  document.querySelectorAll('.ticket-tier-option').forEach(el => {
+    el.classList.toggle('selected', el.dataset.tierId == tierId);
+  });
+}
+
+async function registerForEvent() {
+  if (!selectedTierId && currentEvent.ticket_tiers.length > 0) {
+    // Auto-select first if only one
+    if (currentEvent.ticket_tiers.length === 1) {
+      selectTier(currentEvent.ticket_tiers[0].id);
+    } else {
+      Toast.info('Please select a ticket type');
+      return;
+    }
+  }
+  const btn = document.getElementById('register-btn');
+  btn.disabled = true; btn.innerHTML = '<div class="spinner"></div>';
+  try {
+    const reg = await API.post('/registrations', {
+      event_id: parseInt(eventId),
+      ticket_tier_id: selectedTierId || currentEvent.ticket_tiers[0]?.id,
+      custom_field_responses: {}
+    });
+    const isWaitlist = reg.status === 'waitlisted';
+    Toast.success(isWaitlist ? 'Added to waitlist!' : 'Registration confirmed! 🎉');
+    btn.textContent = isWaitlist ? '⏳ On Waitlist' : '✅ Registered';
+    setTimeout(() => window.location.href = '/dashboard', 1500);
+  } catch(err) {
+    Toast.error(err.message);
+    btn.disabled = false; btn.textContent = 'Register Now';
+  }
+}
+
+async function loadComments() {
+  try {
+    const comments = await API.get(`/comments/event/${eventId}`);
+    const el = document.getElementById('comments-list');
+    if (!el) return;
+    if (comments.length === 0) {
+      el.innerHTML = '<div style="color:var(--text-3);font-size:14px;padding:16px 0">No comments yet. Be the first!</div>';
+      return;
+    }
+    el.innerHTML = comments.map(c => commentHTML(c)).join('');
+  } catch {}
+}
+
+function commentHTML(c) {
+  const user = Auth.getUser();
+  return `<div style="border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div class="nav-avatar" style="width:32px;height:32px;font-size:13px">${c.author?.full_name?.charAt(0)||'?'}</div>
+      <div>
+        <div style="font-weight:600;font-size:14px">${c.author?.full_name||'Unknown'}</div>
+        <div style="font-size:12px;color:var(--text-3)">${Utils.formatDateTime(c.created_at)}</div>
+      </div>
+      ${c.is_question?'<span class="badge badge-category">❓ Question</span>':''}
+    </div>
+    <div style="color:var(--text-2);font-size:14px;line-height:1.6">${c.content}</div>
+    ${c.replies?.map(r=>`
+      <div style="margin-top:12px;padding-left:20px;border-left:2px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <div class="nav-avatar" style="width:24px;height:24px;font-size:11px">${r.author?.full_name?.charAt(0)||'?'}</div>
+          <div style="font-weight:600;font-size:13px">${r.author?.full_name||'Unknown'}</div>
+        </div>
+        <div style="color:var(--text-2);font-size:13px">${r.content}</div>
+      </div>`).join('')||''}
+    ${Auth.isLoggedIn()?`<button onclick="showReply(${c.id})" style="margin-top:10px;font-size:12px;color:var(--accent);background:none;border:none;cursor:pointer">↩ Reply</button>
+      <div id="reply-${c.id}" style="display:none;margin-top:8px">
+        <textarea class="form-textarea" id="reply-text-${c.id}" style="min-height:60px" placeholder="Write a reply..."></textarea>
+        <button class="btn btn-primary btn-sm" onclick="postReply(${c.id})" style="margin-top:6px">Reply</button>
+      </div>`:''}
+  </div>`;
+}
+
+function showReply(commentId) {
+  const el = document.getElementById(`reply-${commentId}`);
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function postReply(parentId) {
+  const text = document.getElementById(`reply-text-${parentId}`).value.trim();
+  if (!text) return;
+  try {
+    await API.post(`/comments/event/${eventId}`, { content: text, parent_id: parentId });
+    Toast.success('Reply posted!');
+    loadComments();
+  } catch(err) { Toast.error(err.message); }
+}
+
+async function postComment() {
+  const text = document.getElementById('comment-text').value.trim();
+  const isQ = document.getElementById('is-question')?.checked || false;
+  if (!text) { Toast.info('Please write something'); return; }
+  try {
+    await API.post(`/comments/event/${eventId}`, { content: text, is_question: isQ });
+    document.getElementById('comment-text').value = '';
+    Toast.success('Comment posted!');
+    loadComments();
+  } catch(err) { Toast.error(err.message); }
+}
+
+async function deleteEvent() {
+  if (!confirm('Delete this event? This cannot be undone.')) return;
+  try {
+    await API.delete(`/events/${eventId}`);
+    Toast.success('Event deleted');
+    setTimeout(() => window.location.href = '/dashboard', 1000);
+  } catch(err) { Toast.error(err.message); }
+}
+
+// Auto-select if single tier
+document.addEventListener('DOMContentLoaded', () => {
+  loadEvent();
+});
+</script>
+</body>
+</html>

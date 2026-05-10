@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In — EventFlow</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+<div class="auth-page">
+  <div style="width:100%;max-width:440px">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <a href="/" class="nav-logo" style="justify-content:center;font-size:28px">⚡ Event<span>Flow</span></a>
+      </div>
+      <div class="auth-title" style="text-align:center">Welcome back</div>
+      <div class="auth-sub" style="text-align:center;margin-bottom:28px">Sign in to your account to continue</div>
+      
+      <div id="error-msg" style="display:none;background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.25);color:var(--red);border-radius:var(--radius-sm);padding:12px 14px;font-size:14px;margin-bottom:16px"></div>
+      
+      <form id="login-form" style="display:flex;flex-direction:column;gap:16px">
+        <div class="form-group">
+          <label class="form-label">Email or Username</label>
+          <input type="text" class="form-input" id="email" placeholder="you@example.com" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="display:flex;justify-content:space-between">
+            Password
+            <a href="#" style="color:var(--accent);font-size:12px">Forgot password?</a>
+          </label>
+          <input type="password" class="form-input" id="password" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:4px;padding:12px" id="submit-btn">
+          Sign In
+        </button>
+      </form>
+      
+      <div class="divider">or</div>
+      
+      <div style="background:var(--bg-elevated);border-radius:var(--radius-sm);padding:14px;font-size:13px;color:var(--text-2)">
+        <strong style="color:var(--text-1);display:block;margin-bottom:8px">Demo Accounts</strong>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div>🔴 Admin: <code style="color:var(--accent-2)">admin@eventflow.com</code> / <code style="color:var(--accent-2)">admin123</code></div>
+          <div>🟡 Organizer: <code style="color:var(--accent-2)">organizer@eventflow.com</code> / <code style="color:var(--accent-2)">org123</code></div>
+          <div>🟢 Attendee: <code style="color:var(--accent-2)">attendee@eventflow.com</code> / <code style="color:var(--accent-2)">att123</code></div>
+        </div>
+      </div>
+      
+      <div class="auth-switch">Don't have an account? <a href="/register">Create one</a></div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script>
+if (Auth.isLoggedIn()) window.location.href = '/dashboard';
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('submit-btn');
+  const errEl = document.getElementById('error-msg');
+  
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div>';
+  errEl.style.display = 'none';
+  
+  try {
+    const user = await Auth.login(
+      document.getElementById('email').value,
+      document.getElementById('password').value
+    );
+    Toast.success(`Welcome back, ${user.full_name}!`);
+    setTimeout(() => { window.location.href = '/dashboard'; }, 800);
+  } catch(err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Sign In';
+  }
+});
+
+// Quick fill demo
+document.querySelectorAll('code').forEach(el => {
+  el.style.cursor = 'pointer';
+  el.title = 'Click to fill';
+  el.addEventListener('click', () => {
+    const text = el.textContent;
+    if (text.includes('@')) document.getElementById('email').value = text;
+    else document.getElementById('password').value = text;
+  });
+});
+</script>
+</body>
+</html>

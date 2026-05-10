@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Event — EventFlow</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+<nav class="navbar">
+  <div class="container">
+    <a href="/" class="nav-logo">⚡ Event<span>Flow</span></a>
+    <div class="nav-links"><a href="/">Discover</a><a href="/events">Browse All</a></div>
+    <div class="nav-right" id="nav-right"></div>
+  </div>
+</nav>
+
+<div style="padding:40px 0 80px">
+  <div class="container-sm">
+    <div style="margin-bottom:32px">
+      <a href="/dashboard" style="color:var(--text-3);font-size:14px">← Dashboard</a>
+      <h1 style="font-family:var(--font-display);font-size:32px;font-weight:800;margin-top:12px" id="page-title">Create New Event</h1>
+      <p style="color:var(--text-2);margin-top:6px">Fill in the details below to publish your event</p>
+    </div>
+
+    <div id="form-error" style="display:none;background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.25);color:var(--red);border-radius:var(--radius-sm);padding:14px;margin-bottom:20px"></div>
+
+    <form id="event-form">
+      <!-- Basic Info -->
+      <div class="card" style="margin-bottom:20px">
+        <div style="padding:20px 24px;border-bottom:1px solid var(--border);font-family:var(--font-display);font-weight:700;font-size:16px">📋 Basic Information</div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:18px">
+          <div class="form-group">
+            <label class="form-label">Event Title *</label>
+            <input type="text" class="form-input" id="title" placeholder="Give your event a compelling title" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Short Description</label>
+            <input type="text" class="form-input" id="short_description" placeholder="One-line summary (shows in event cards)" maxlength="200">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Full Description</label>
+            <textarea class="form-textarea" id="description" rows="6" placeholder="Describe your event in detail — agenda, speakers, what to expect..."></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Category *</label>
+              <select class="form-select form-input" id="category" required>
+                <option value="conference">🎤 Conference</option>
+                <option value="workshop">🛠️ Workshop</option>
+                <option value="concert">🎵 Concert</option>
+                <option value="meetup">☕ Meetup</option>
+                <option value="webinar">💻 Webinar</option>
+                <option value="sports">⚽ Sports</option>
+                <option value="arts">🎨 Arts</option>
+                <option value="networking">🤝 Networking</option>
+                <option value="other">📅 Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Status</label>
+              <select class="form-select form-input" id="status">
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tags (comma-separated)</label>
+            <input type="text" class="form-input" id="tags" placeholder="tech, networking, 2026">
+          </div>
+        </div>
+      </div>
+
+      <!-- Date & Location -->
+      <div class="card" style="margin-bottom:20px">
+        <div style="padding:20px 24px;border-bottom:1px solid var(--border);font-family:var(--font-display);font-weight:700;font-size:16px">📍 Date & Location</div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:18px">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Start Date & Time *</label>
+              <input type="datetime-local" class="form-input" id="start_datetime" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">End Date & Time *</label>
+              <input type="datetime-local" class="form-input" id="end_datetime" required>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <label style="display:flex;align-items:center;gap-8px;cursor:pointer;gap:8px">
+              <input type="checkbox" id="is_online" onchange="toggleOnline(this.checked)">
+              <span style="font-weight:600;font-size:14px">🌐 This is an online event</span>
+            </label>
+          </div>
+          <div id="venue-fields" style="display:flex;flex-direction:column;gap:16px">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Venue Name</label>
+                <input type="text" class="form-input" id="venue_name" placeholder="Convention Center, Hotel...">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Address</label>
+                <input type="text" class="form-input" id="venue_address" placeholder="123 Main St">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">City</label>
+                <input type="text" class="form-input" id="venue_city" placeholder="San Francisco">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Country</label>
+                <input type="text" class="form-input" id="venue_country" placeholder="USA">
+              </div>
+            </div>
+          </div>
+          <div id="online-fields" style="display:none">
+            <div class="form-group">
+              <label class="form-label">Online Event URL</label>
+              <input type="url" class="form-input" id="online_url" placeholder="https://zoom.us/j/...">
+            </div>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="is_public" checked>
+            <span style="font-weight:600;font-size:14px">🌍 Public event (visible to everyone)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Cover Image -->
+      <div class="card" style="margin-bottom:20px">
+        <div style="padding:20px 24px;border-bottom:1px solid var(--border);font-family:var(--font-display);font-weight:700;font-size:16px">🖼️ Cover Image</div>
+        <div class="card-body">
+          <div id="cover-preview" style="display:none;margin-bottom:16px">
+            <img id="cover-img-preview" style="width:100%;height:200px;object-fit:cover;border-radius:var(--radius);display:block">
+          </div>
+          <label style="display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed var(--border-strong);border-radius:var(--radius);padding:40px;cursor:pointer;transition:var(--transition)"
+            onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border-strong)'">
+            <div style="font-size:40px;margin-bottom:12px">📸</div>
+            <div style="font-weight:600;margin-bottom:4px">Click to upload cover image</div>
+            <div style="font-size:13px;color:var(--text-3)">JPG, PNG, WebP up to 5MB • Recommended: 1200×630</div>
+            <input type="file" id="cover-file" accept="image/*" style="display:none" onchange="previewCover(this)">
+          </label>
+          <div id="upload-status" style="margin-top:10px;font-size:13px;color:var(--text-3)"></div>
+        </div>
+      </div>
+
+      <!-- Tickets -->
+      <div class="card" style="margin-bottom:28px">
+        <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+          <div style="font-family:var(--font-display);font-weight:700;font-size:16px">🎟️ Ticket Types</div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="addTier()">+ Add Ticket Type</button>
+        </div>
+        <div class="card-body">
+          <div id="tiers-list" style="display:flex;flex-direction:column;gap:16px"></div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div style="display:flex;gap:12px;justify-content:flex-end">
+        <a href="/dashboard" class="btn btn-secondary">Cancel</a>
+        <button type="button" onclick="saveEvent('draft')" class="btn btn-secondary" id="draft-btn">Save as Draft</button>
+        <button type="submit" class="btn btn-primary" id="publish-btn">🚀 Publish Event</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script>
+if (!Auth.require()) throw new Error();
+if (!Auth.isOrganizer()) { Toast.error('Organizer account required'); window.location.href = '/dashboard'; }
+
+const pathParts = window.location.pathname.split('/');
+const editId = pathParts[1] === 'edit-event' ? pathParts[2] : null;
+if (editId) document.getElementById('page-title').textContent = 'Edit Event';
+let uploadedCoverUrl = null;
+let tierCount = 0;
+
+if (editId) {
+  document.getElementById('page-title').textContent = 'Edit Event';
+  loadEventForEdit();
+}
+
+// Default: add one free tier
+addTier();
+
+// Set default start time to tomorrow at 9am
+const tomorrow = new Date();
+tomorrow.setDate(tomorrow.getDate() + 1);
+tomorrow.setHours(9, 0, 0, 0);
+const end = new Date(tomorrow); end.setHours(17, 0, 0, 0);
+document.getElementById('start_datetime').value = tomorrow.toISOString().slice(0,16);
+document.getElementById('end_datetime').value = end.toISOString().slice(0,16);
+
+async function loadEventForEdit() {
+  try {
+    const e = await API.get(`/events/${editId}`);
+    document.getElementById('title').value = e.title;
+    document.getElementById('short_description').value = e.short_description || '';
+    document.getElementById('description').value = e.description || '';
+    document.getElementById('category').value = e.category;
+    document.getElementById('status').value = e.status;
+    document.getElementById('tags').value = (e.tags||[]).join(', ');
+    document.getElementById('start_datetime').value = new Date(e.start_datetime).toISOString().slice(0,16);
+    document.getElementById('end_datetime').value = new Date(e.end_datetime).toISOString().slice(0,16);
+    document.getElementById('is_online').checked = e.is_online;
+    toggleOnline(e.is_online);
+    document.getElementById('venue_name').value = e.venue_name || '';
+    document.getElementById('venue_address').value = e.venue_address || '';
+    document.getElementById('venue_city').value = e.venue_city || '';
+    document.getElementById('venue_country').value = e.venue_country || '';
+    document.getElementById('online_url').value = e.online_url || '';
+    document.getElementById('is_public').checked = e.is_public;
+    if (e.cover_image_url) {
+      uploadedCoverUrl = e.cover_image_url;
+      document.getElementById('cover-preview').style.display = 'block';
+      document.getElementById('cover-img-preview').src = e.cover_image_url;
+    }
+    // Load existing tiers
+    document.getElementById('tiers-list').innerHTML = '';
+    e.ticket_tiers.forEach(t => addTier(t));
+  } catch(err) { Toast.error('Failed to load event'); }
+}
+
+function toggleOnline(isOnline) {
+  document.getElementById('venue-fields').style.display = isOnline ? 'none' : 'flex';
+  document.getElementById('online-fields').style.display = isOnline ? 'block' : 'none';
+}
+
+function previewCover(input) {
+  if (!input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('cover-img-preview').src = e.target.result;
+    document.getElementById('cover-preview').style.display = 'block';
+  };
+  reader.readAsDataURL(input.files[0]);
+  document.getElementById('upload-status').textContent = `Selected: ${input.files[0].name}`;
+}
+
+function addTier(existing = null) {
+  tierCount++;
+  const id = tierCount;
+  const div = document.createElement('div');
+  div.id = `tier-${id}`;
+  div.style.cssText = 'background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:18px;position:relative';
+  div.innerHTML = `
+    <button type="button" onclick="document.getElementById('tier-${id}').remove()" 
+      style="position:absolute;top:12px;right:12px;color:var(--red);background:none;border:none;cursor:pointer;font-size:18px">✕</button>
+    <div style="font-weight:700;margin-bottom:14px;font-size:14px">Ticket Type ${id}</div>
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:12px">
+      <div class="form-group">
+        <label class="form-label">Name *</label>
+        <input type="text" class="form-input tier-name" placeholder="General Admission, VIP..." value="${existing?.name||''}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Price ($)</label>
+        <input type="number" class="form-input tier-price" min="0" step="0.01" value="${existing?.price||0}" onchange="this.closest('[id^=tier]').querySelector('.tier-type').value=this.value>0?'paid':'free'">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Capacity</label>
+        <input type="number" class="form-input tier-capacity" min="1" placeholder="Unlimited" value="${existing?.capacity||''}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <input type="text" class="form-input tier-desc" placeholder="What's included..." value="${existing?.description||''}">
+    </div>
+    <input type="hidden" class="tier-type" value="${existing?.ticket_type||'free'}">`;
+  document.getElementById('tiers-list').appendChild(div);
+}
+
+function collectTiers() {
+  const tiers = [];
+  document.querySelectorAll('[id^="tier-"]').forEach(el => {
+    const name = el.querySelector('.tier-name')?.value?.trim();
+    if (!name) return;
+    const price = parseFloat(el.querySelector('.tier-price')?.value || 0);
+    const cap = el.querySelector('.tier-capacity')?.value;
+    tiers.push({
+      name,
+      description: el.querySelector('.tier-desc')?.value || null,
+      ticket_type: price > 0 ? 'paid' : 'free',
+      price,
+      currency: 'USD',
+      capacity: cap ? parseInt(cap) : null,
+    });
+  });
+  return tiers;
+}
+
+async function uploadCoverIfNeeded(eventId) {
+  const file = document.getElementById('cover-file').files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('file', file);
+  document.getElementById('upload-status').textContent = 'Uploading cover image...';
+  try {
+    const res = await API.postForm(`/events/${eventId}/cover-image`, formData);
+    uploadedCoverUrl = res.cover_image_url;
+    document.getElementById('upload-status').textContent = '✅ Image uploaded';
+  } catch(err) {
+    document.getElementById('upload-status').textContent = '⚠️ Image upload failed (event saved)';
+  }
+}
+
+async function saveEvent(forcedStatus = null) {
+  const errEl = document.getElementById('form-error');
+  errEl.style.display = 'none';
+
+  const title = document.getElementById('title').value.trim();
+  if (!title) { errEl.textContent = 'Event title is required'; errEl.style.display = 'block'; return; }
+  const start = document.getElementById('start_datetime').value;
+  const end = document.getElementById('end_datetime').value;
+  if (!start || !end) { errEl.textContent = 'Start and end date are required'; errEl.style.display = 'block'; return; }
+  if (new Date(end) <= new Date(start)) { errEl.textContent = 'End time must be after start time'; errEl.style.display = 'block'; return; }
+
+  const btn = forcedStatus === 'draft' ? document.getElementById('draft-btn') : document.getElementById('publish-btn');
+  btn.disabled = true; btn.innerHTML = '<div class="spinner"></div>';
+
+  const tags = document.getElementById('tags').value.split(',').map(t=>t.trim()).filter(Boolean);
+  const status = forcedStatus || document.getElementById('status').value;
+
+  const payload = {
+    title,
+    short_description: document.getElementById('short_description').value || null,
+    description: document.getElementById('description').value || null,
+    category: document.getElementById('category').value,
+    status,
+    is_public: document.getElementById('is_public').checked,
+    is_online: document.getElementById('is_online').checked,
+    start_datetime: new Date(start).toISOString(),
+    end_datetime: new Date(end).toISOString(),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    venue_name: document.getElementById('venue_name').value || null,
+    venue_address: document.getElementById('venue_address').value || null,
+    venue_city: document.getElementById('venue_city').value || null,
+    venue_country: document.getElementById('venue_country').value || null,
+    online_url: document.getElementById('online_url').value || null,
+    tags,
+    ticket_tiers: collectTiers(),
+    custom_fields: [],
+  };
+
+  try {
+    let event;
+    if (editId) {
+      event = await API.put(`/events/${editId}`, payload);
+    } else {
+      event = await API.post('/events', payload);
+    }
+    await uploadCoverIfNeeded(event.id);
+    Toast.success(editId ? 'Event updated!' : 'Event created!');
+    setTimeout(() => window.location.href = `/event/${event.id}`, 1000);
+  } catch(err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = forcedStatus === 'draft' ? 'Save as Draft' : '🚀 Publish Event';
+  }
+}
+
+document.getElementById('event-form').addEventListener('submit', e => { e.preventDefault(); saveEvent(); });
+document.getElementById('draft-btn').addEventListener('click', () => saveEvent('draft'));
+</script>
+</body>
+</html>

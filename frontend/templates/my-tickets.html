@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Tickets — EventFlow</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+<nav class="navbar">
+  <div class="container">
+    <a href="/" class="nav-logo">⚡ Event<span>Flow</span></a>
+    <div class="nav-links"><a href="/">Discover</a><a href="/events">Browse All</a></div>
+    <div class="nav-right" id="nav-right"></div>
+  </div>
+</nav>
+
+<div style="padding:40px 0 80px">
+  <div class="container">
+    <div style="margin-bottom:32px">
+      <a href="/dashboard" style="color:var(--text-3);font-size:14px">← Dashboard</a>
+      <h1 style="font-family:var(--font-display);font-size:32px;font-weight:800;margin-top:12px">My Tickets 🎟️</h1>
+    </div>
+    <div class="tabs" style="margin-bottom:28px">
+      <button class="tab-btn active" onclick="showTab('upcoming',this)">Upcoming</button>
+      <button class="tab-btn" onclick="showTab('past',this)">Past</button>
+      <button class="tab-btn" onclick="showTab('all',this)">All Tickets</button>
+    </div>
+    <div id="tickets-content"><div class="page-loader"><div class="spinner"></div></div></div>
+  </div>
+</div>
+
+<!-- Ticket modal template -->
+<div id="ticket-modal-root"></div>
+
+<script src="/static/js/app.js"></script>
+<script>
+if (!Auth.require()) throw new Error();
+let allRegs = [];
+let activeTab = 'upcoming';
+
+async function loadTickets() {
+  try {
+    allRegs = await API.get('/registrations/my');
+    showTab('upcoming');
+  } catch(err) { Toast.error('Failed to load tickets'); }
+}
+
+function showTab(tab, btn) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  const now = new Date();
+  let filtered = allRegs;
+  if (tab === 'upcoming') filtered = allRegs.filter(r => r.event && new Date(r.event.start_datetime) >= now && r.status !== 'cancelled');
+  else if (tab === 'past') filtered = allRegs.filter(r => r.event && new Date(r.event.start_datetime) < now);
+
+  renderTickets(filtered);
+}
+
+function renderTickets(regs) {
+  if (regs.length === 0) {
+    document.getElementById('tickets-content').innerHTML = `
+      <div class="empty-state">
+        <div class="icon">🎟️</div>
+        <h3>No tickets here</h3>
+        <p>Register for events to see your tickets</p>
+        <a href="/events" class="btn btn-primary" style="margin-top:16px">Browse Events</a>
+      </div>`;
+    return;
+  }
+
+  document.getElementById('tickets-content').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:20px">
+      ${regs.map(r => ticketCardHTML(r)).join('')}
+    </div>`;
+}
+
+function ticketCardHTML(r) {
+  const statusColors = { confirmed:'var(--green)', waitlisted:'var(--yellow)', cancelled:'var(--red)', checked_in:'var(--blue)' };
+  const statusEmoji = { confirmed:'✅', waitlisted:'⏳', cancelled:'❌', checked_in:'✔️' };
+  const color = statusColors[r.status] || 'var(--text-2)';
+  const emoji = statusEmoji[r.status] || '🎟️';
+  return `
+    <div class="card" style="overflow:visible">
+      <div style="background:linear-gradient(135deg,var(--bg-elevated),#1e2330);padding:20px;display:flex;justify-content:space-between;align-items:start">
+        <div>
+          <div style="font-size:28px;margin-bottom:8px">${r.event ? Utils.categoryEmoji(r.event.category) : '📅'}</div>
+          <div style="font-family:var(--font-display);font-size:16px;font-weight:700;color:var(--text-1)">${r.event?.title || 'Event #'+r.event_id}</div>
+          <div style="font-size:13px;color:var(--text-2);margin-top:4px">${r.event ? Utils.formatDateTime(r.event.start_datetime) : ''}</div>
+        </div>
+        <span style="color:${color};font-size:20px">${emoji}</span>
+      </div>
+      <div style="padding:16px 20px;border-top:2px dashed var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div>
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.05em">Ticket #</div>
+            <div style="font-family:monospace;font-weight:700;font-size:14px;color:var(--accent-2)">${r.ticket_number}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.05em">Amount Paid</div>
+            <div style="font-weight:700">${r.amount_paid > 0 ? '$'+r.amount_paid.toFixed(2) : 'FREE'}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+          <span class="badge" style="background:${color}20;color:${color}">${r.status.replace('_',' ')}</span>
+          ${r.ticket_tier ? `<span class="badge" style="background:var(--bg-elevated)">${r.ticket_tier.name}</span>` : ''}
+        </div>
+        <div style="display:flex;gap:8px">
+          ${r.status !== 'cancelled' ? `<button onclick="viewTicket('${r.ticket_number}','${r.qr_code_url||''}')" class="btn btn-primary btn-sm" style="flex:1">🎫 View Ticket</button>` : ''}
+          <a href="/event/${r.event_id}" class="btn btn-secondary btn-sm" style="flex:1">View Event</a>
+          ${r.status === 'confirmed' ? `<button onclick="cancelTicket(${r.id})" class="btn btn-ghost btn-sm" title="Cancel">✕</button>` : ''}
+        </div>
+      </div>
+    </div>`;
+}
+
+function viewTicket(ticketNum, qrUrl) {
+  const { close } = openModal(`
+    <div class="modal-header">
+      <div class="modal-title">🎟️ Your Ticket</div>
+      <button class="modal-close btn btn-ghost">✕</button>
+    </div>
+    <div class="modal-body" style="align-items:center;text-align:center">
+      <div class="qr-ticket" style="margin:0 auto">
+        ${qrUrl
+          ? `<img src="${qrUrl}" alt="QR Code" style="width:200px;height:200px;border-radius:8px">`
+          : `<div style="width:200px;height:200px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-size:64px;border-radius:8px;margin:0 auto">🎫</div>`}
+        <div style="font-weight:800;font-size:20px;color:#111;margin-top:16px">EventFlow Ticket</div>
+        <div style="font-family:monospace;font-size:14px;color:#666;margin-top:6px;letter-spacing:0.1em">${ticketNum}</div>
+      </div>
+      <p style="color:var(--text-2);font-size:13px;max-width:280px">Present this QR code at the event entrance for check-in</p>
+      <button class="btn btn-secondary btn-sm" onclick="Utils.copyText('${ticketNum}')">📋 Copy Ticket Number</button>
+    </div>`);
+}
+
+async function cancelTicket(regId) {
+  if (!confirm('Are you sure you want to cancel this registration?')) return;
+  try {
+    await API.delete(`/registrations/${regId}`);
+    Toast.success('Registration cancelled');
+    loadTickets();
+  } catch(err) { Toast.error(err.message); }
+}
+
+document.addEventListener('DOMContentLoaded', loadTickets);
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edit Event — EventFlow</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+<!-- This page loads the create-event page in edit mode -->
+<script>
+  // Redirect to create-event template but signal edit mode via URL
+  const id = window.location.pathname.split('/').pop();
+  // We handle edit in create-event.html by detecting the path
+  document.write('<scr'+'ipt src="/static/js/app.js"><'+'/scr'+'ipt>');
+</script>
+<script>
+  // Simply render the create-event page content here for edit mode
+  window.location.replace('/create-event#edit=' + window.location.pathname.split('/').pop());
+</script>
+</body>
+</html>
